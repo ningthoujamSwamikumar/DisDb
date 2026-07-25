@@ -1,6 +1,9 @@
 # Design Doc v1
 Create in memory key value store by using a hash map.
-Take inputs through direct CLI and TCP server-client.
+- start a tcp server
+- send message from a tcp client cli
+- receive the message, deserialize it, and process the command
+
 
 # DD v2
 Add concurrency - multiple clients to connect and get/set concurrently.
