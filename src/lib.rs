@@ -1,6 +1,9 @@
-mod cli;
-
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+use clap::Subcommand;
+
+pub mod connection;
 
 pub struct KVStore {
     store: HashMap<String, String>,
@@ -14,7 +17,7 @@ impl KVStore {
     }
 
     /// Returns `Some(value)` if present else `None`
-    pub fn get(&self, key: impl AsRef<String>) -> Option<&String> {
+    pub fn get(&self, key: impl AsRef<str>) -> Option<&String> {
         self.store.get(key.as_ref())
     }
 
@@ -32,33 +35,14 @@ impl KVStore {
     }
 }
 
-pub enum KvsCommands<'a> {
-    GET(&'a str),
-    SET(String, String),
-    CLEAR,
-    NoOp
+#[derive(Debug, Subcommand, Serialize, Deserialize)]
+pub enum KvsCommand {
+    Set { key: String, value: String },
+    Get { key: String },
 }
 
-/*
-impl <'a> From<&'a str> for Commands<'a> {
-    fn from(value: &str) -> Self {
-        let cmd = value.trim();
-        let tokens = cmd.split_whitespace();
-        match tokens.next() {
-            Some(first) => {
-                match first.to_lowercase() {
-                    "get" => {
-
-                    }
-                    "set" => {
-
-                    },
-                    "clear" => Commands::CLEAR
-                }
-            },
-            None => {
-                Commands::NoOp
-            },
-        }
-    }
-} */
+#[derive(Debug, Serialize, Deserialize)]
+pub enum KvsResult {
+    Get(Option<String>),
+    Set(Option<String>)
+}
