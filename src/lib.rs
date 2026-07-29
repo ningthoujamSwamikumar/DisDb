@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use clap::Subcommand;
+use serde::{Deserialize, Serialize};
 
 pub mod connection;
+pub mod error;
 
 pub struct KVStore {
     store: HashMap<String, String>,
@@ -35,14 +36,33 @@ impl KVStore {
     }
 }
 
-#[derive(Debug, Subcommand, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum Frame {
+    Command(KvsCommand),
+    Result(KvsResult),
+}
+
+#[derive(Debug, Subcommand, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum KvsCommand {
     Set { key: String, value: String },
     Get { key: String },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum KvsResult {
     Get(Option<String>),
-    Set(Option<String>)
+    Set(Option<String>),
+    Error(String),
+}
+
+impl From<KvsCommand> for Frame {
+    fn from(value: KvsCommand) -> Self {
+        Frame::Command(value)
+    }
+}
+
+impl From<KvsResult> for Frame {
+    fn from(value: KvsResult) -> Self {
+        Frame::Result(value)
+    }
 }

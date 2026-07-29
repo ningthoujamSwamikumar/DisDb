@@ -1,18 +1,21 @@
 use std::{error::Error, str::from_utf8};
 
 use bytes::{Buf, BytesMut};
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::{KvsCommand, KvsResult};
+use crate::Frame;
 
-pub struct Connection {
-    stream: TcpStream,
+pub struct Connection<T: AsyncRead + AsyncWrite + Unpin> {
+    stream: T,
     buffer: BytesMut,
     cursor: usize, // tracks the scan on buffer
 }
 
-impl Connection {
-    pub fn new(stream: TcpStream) -> Self {
+impl<T> Connection<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    pub fn new(stream: T) -> Self {
         Connection {
             stream,
             buffer: BytesMut::with_capacity(4096),
@@ -21,15 +24,15 @@ impl Connection {
     }
 
     /// returns a frame if received from the internal buffer
-    pub async fn read_frame(&mut self) -> Result<Option<KvsCommand>, Box<dyn Error>> {
+    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn Error>> {
         let mut is_closed = false;
         // loops until a complete frame is received
         loop {
             // try to parse a frame
             if let Some(pos) = self.buffer[self.cursor..].iter().position(|b| *b == b'\0') {
-                let frame = self.buffer.split_to(self.cursor + pos);
-                let json_str = from_utf8(&frame)?;
-                let cmd: KvsCommand = serde_json::from_str(json_str)?;
+                let frame_bytes = self.buffer.split_to(self.cursor + pos);
+                let frame_bytes_str = from_utf8(&frame_bytes)?;
+                let frame: Frame = serde_json::from_str(frame_bytes_str)?;
 
                 // advance the internal buffer cursor to remove the delimitor
                 self.buffer.advance(1);
@@ -37,7 +40,7 @@ impl Connection {
                 // reset cursor for next frame
                 self.cursor = 0;
 
-                return Ok(Some(cmd));
+                return Ok(Some(frame));
             }
 
             if is_closed {
@@ -67,9 +70,11 @@ impl Connection {
         }
     }
 
-    pub async fn write_frame(&mut self, frame: KvsResult)->Result<(), std::io::Error>{
-        let json_str = serde_json::to_string(&frame)?;
-        self.stream.write_all(json_str.as_bytes()).await?;
+    // write a frame to the stream
+    pub async fn write_frame(&mut self, frame: Frame) -> Result<(), std::io::Error> {
+        let mut frame_str = serde_json::to_string(&frame)?;
+        frame_str.push('\0'); // adds delimitor
+        self.stream.write_all(frame_str.as_bytes()).await?;
 
         Ok(())
     }
@@ -78,9 +83,8 @@ impl Connection {
     async fn read_stream(&mut self) -> Result<usize, std::io::Error> {
         // loops until a true positive or connection is closed
         loop {
-            self.stream.readable().await?;
             // Note: try_read expects &mut [u8], while try_read_buf expects &mut impl BufMut
-            match self.stream.try_read_buf(&mut self.buffer) {
+            match self.stream.read_buf(&mut self.buffer).await {
                 Ok(n) => {
                     println!("Read {n} bytes");
                     return Ok(n);
@@ -95,4 +99,31 @@ impl Connection {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Frame, KvsCommand, KvsResult, connection::Connection};
+
+    #[tokio::test]
+    async fn test_write_and_read_frame() {
+        // Create an in-memory channel that acts like a socket connection
+        let (client_io, server_io) = tokio::io::duplex(4096);
+
+        let mut client_conn = Connection::new(client_io);
+        let mut server_conn = Connection::new(server_io);
+
+        let client_frame: Frame = KvsCommand::Set {
+            key: "sunsine".to_string(),
+            value: "rain".to_string(),
+        }
+        .into();
+        client_conn.write_frame(client_frame.clone()).await.unwrap();
+
+        let server_frame = server_conn.read_frame().await.unwrap().unwrap();
+        assert_eq!(client_frame, server_frame);
+    }
+
+    #[tokio::test]
+    async fn test_partial_frames() {}
 }

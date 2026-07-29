@@ -1,6 +1,6 @@
-use std::{error::Error, str::from_utf8};
+use std::error::Error;
 
-use dist_db::{KVStore, connection::Connection};
+use dist_db::{Frame, KVStore, KvsCommand, KvsResult, connection::Connection};
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -14,9 +14,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         let (tcp_stream, socket_addr) = listener.accept().await?;
-
         println!("Connection established with {}", socket_addr);
-
         let mut connection = Connection::new(tcp_stream);
 
         // loops frames until connection is dropped
@@ -25,13 +23,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 Some(frame) => {
                     println!("Received: {frame:#?}");
                     match frame {
-                        dist_db::KvsCommand::Set { key, value } => {
+                        Frame::Command(KvsCommand::Set { key, value }) => {
                             let res = kv.set(key, value);
-                            connection.write_frame(dist_db::KvsResult::Set(res)).await?;
+                            connection.write_frame(KvsResult::Set(res).into()).await?;
                         }
-                        dist_db::KvsCommand::Get { key } => {
+                        Frame::Command(KvsCommand::Get { key }) => {
                             let res = kv.get(key).map(|r| r.to_owned());
-                            connection.write_frame(dist_db::KvsResult::Get(res)).await?;
+                            connection.write_frame(KvsResult::Get(res).into()).await?;
+                        }
+                        _ => {
+                            connection
+                                .write_frame(
+                                    KvsResult::Error("Invalid command!".to_string()).into(),
+                                )
+                                .await?;
                         }
                     }
                 }
