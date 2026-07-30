@@ -44,12 +44,17 @@ where
             }
 
             if is_closed {
-                // connection is closed, so reset
+                // connection is closed
+
+                if self.buffer.is_empty() {
+                    return Ok(None);
+                }
+
+                // else reset, but indicate error
                 self.buffer.clear();
                 self.cursor = 0;
 
                 eprintln!("Connection closed while reading frame!");
-
                 return Err("Unexpected EOF while reading frame".into());
             }
 
