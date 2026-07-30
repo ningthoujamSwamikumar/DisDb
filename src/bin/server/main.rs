@@ -19,7 +19,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // loops frames until connection is dropped
         loop {
-            match connection.read_frame().await? {
+            let optional_frame = match connection.read_frame().await {
+                Ok(res) => res,
+                Err(e) => {
+                    eprintln!("Error reading frame:\n{e:#?}");
+                    None
+                }
+            };
+            match optional_frame {
                 Some(frame) => {
                     println!("Received: {frame:#?}");
                     match frame {
@@ -40,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                     }
                 }
-                None => break, // connection is closed
+                None => break, // failed to read frame
             }
         }
 

@@ -48,9 +48,9 @@ where
                 self.buffer.clear();
                 self.cursor = 0;
 
-                println!("Connection is closed! Reseting connection states.");
+                eprintln!("Connection closed while reading frame!");
 
-                return Ok(None);
+                return Err("Unexpected EOF while reading frame".into());
             }
 
             // if the delimitor is not received yet
@@ -89,10 +89,12 @@ where
                     println!("Read {n} bytes");
                     return Ok(n);
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    // false positive readiness
-                    continue;
-                }
+                // // unlike try_read method with pairs with readable or ready method,
+                // // this method doesn't normally give `WouldBlock` or false positive case
+                // Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                //     // false positive readiness
+                //     continue;
+                // }
                 Err(e) => {
                     return Err(e);
                 }
