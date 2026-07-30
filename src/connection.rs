@@ -103,7 +103,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Frame, KvsCommand, KvsResult, connection::Connection};
+    use tokio::io::AsyncWriteExt;
+
+    use crate::{Frame, KvsCommand, connection::Connection};
 
     #[tokio::test]
     async fn test_write_and_read_frame() {
@@ -125,5 +127,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_partial_frames() {}
+    async fn test_partial_frames() {
+        let (mut client_io, server_io) = tokio::io::duplex(4096);
+
+        let mut server_conn = Connection::new(server_io);
+
+        let client_frame: Frame = KvsCommand::Set {
+            key: "age".to_string(),
+            value: "30".to_string(),
+        }
+        .into();
+        let client_frame_str = serde_json::to_string(&client_frame).unwrap();
+        let client_frame_bytes = client_frame_str.as_bytes();
+        let mid = client_frame_bytes.len() / 2;
+        client_io
+            .write_all(&client_frame_bytes[..mid])
+            .await
+            .unwrap(); //sent partial frame
+
+        // start a server task to read the channel
+        let server_task = tokio::spawn(async move {
+            match server_conn.read_frame().await {
+                Ok(res) => res,
+                Err(_) => None,
+            }
+        });
+
+        client_io
+            .write_all(&client_frame_bytes[mid..])
+            .await
+            .unwrap();
+        client_io.write(&[b'\0']).await.unwrap();
+
+        let server_frame = server_task.await.unwrap().unwrap();
+        assert_eq!(client_frame, server_frame);
+    }
 }
