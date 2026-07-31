@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod connection;
 pub mod error;
+pub mod server;
+pub mod client;
 
 pub struct KVStore {
     store: HashMap<String, String>,

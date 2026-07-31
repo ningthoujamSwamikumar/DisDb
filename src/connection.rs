@@ -47,6 +47,7 @@ where
                 // connection is closed
 
                 if self.buffer.is_empty() {
+                    eprintln!("Connection closed!");
                     return Ok(None);
                 }
 
