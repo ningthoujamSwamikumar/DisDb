@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use clap::Subcommand;
 use serde::{Deserialize, Serialize};
 
+pub mod client;
 pub mod connection;
 pub mod error;
 pub mod server;
-pub mod client;
 
 pub struct KVStore {
     store: HashMap<String, String>,
@@ -32,9 +32,12 @@ impl KVStore {
     }
 
     /// Clears all the key-value pairs, and keep the allocated memories for reuse
-    pub fn clear(&mut self) -> bool {
+    pub fn clear(&mut self) {
         self.store.clear();
-        true
+    }
+
+    pub fn count(&self) -> usize {
+        self.store.len()
     }
 }
 
@@ -66,5 +69,42 @@ impl From<KvsCommand> for Frame {
 impl From<KvsResult> for Frame {
     fn from(value: KvsResult) -> Self {
         Frame::Result(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::KVStore;
+
+    #[test]
+    fn test_db_funcs() {
+        let mut db = KVStore::new();
+
+        assert_eq!(db.count(), 0_usize, "Initially db should be empty!");
+        assert!(
+            db.get("something").is_none(),
+            "Should be None if the key doesn't exist!"
+        );
+        assert!(
+            db.set("key1".into(), "val1".into()).is_none(),
+            "First time set should return None!"
+        );
+        assert_eq!(
+            db.get("key1"),
+            Some(&"val1".to_string()),
+            "Unexpected value!"
+        );
+        assert_eq!(
+            db.set("key1".into(), "val1_1".into()),
+            Some("val1".into()),
+            "Update existing entry should return old value!"
+        );
+
+        db.set("key2".into(), "val2".into());
+        db.set("key3".into(), "val3".into());
+        assert_eq!(db.count(), 3_usize, "Unexpected db entry count!");
+
+        db.clear();
+        assert_eq!(db.count(), 0_usize, "Expected db to be empty after clear!");
     }
 }

@@ -53,4 +53,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Client<T> {
             }
         }
     }
+
+    pub async fn shutdown(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.connection.shutdown().await?;
+
+        Ok(())
+    }
 }

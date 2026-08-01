@@ -24,7 +24,7 @@ where
     }
 
     /// returns a frame if received from the internal buffer
-    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn Error>> {
+    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn Error + Send + Sync>> {
         let mut is_closed = false;
         // loops until a complete frame is received
         loop {
@@ -81,6 +81,13 @@ where
         let mut frame_str = serde_json::to_string(&frame)?;
         frame_str.push('\0'); // adds delimitor
         self.stream.write_all(frame_str.as_bytes()).await?;
+
+        Ok(())
+    }
+
+    // close the connection or drop the connection
+    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.stream.shutdown().await?;
 
         Ok(())
     }
