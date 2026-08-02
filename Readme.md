@@ -32,8 +32,11 @@ Test run through 10000 clients, 2000 ops/client
 # DD v2
 Add concurrency - multiple clients to connect and get/set concurrently.
 Benchmark/profile the limit.
-- add concurrency to the server
+- add concurrency to the server ✅
 - use lock free data sharing
+- length delimited framing from scratch
+- length delimited framing using tokio-utils
+- protobuf serialization instead of json string to improve serialization and deserialization
 
 # DD v3
 What happens when crashed? The data shouldn't be lost.

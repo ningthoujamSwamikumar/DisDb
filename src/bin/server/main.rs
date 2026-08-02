@@ -3,8 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use dist_db::{KVStore, server::worker_orchestrator};
-use tokio::net::{TcpListener, TcpStream};
+use dist_db::{KVStore, server::Server};
+use tokio::net::{TcpListener};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -15,18 +15,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind(address).await.unwrap();
     println!("Listening on {address}");
 
-    let (orchestrator_tx, orchestrator_rx) = tokio::sync::mpsc::channel::<TcpStream>(150);
-    // spawn worker orchestrator
-    tokio::spawn(worker_orchestrator(orchestrator_rx, kv, 10));
+    let server = Server::new(kv);
 
     loop {
         let (tcp_stream, socket_addr) = listener.accept().await?;
         println!("Connection established with {}", socket_addr);
 
-        orchestrator_tx
-            .send(tcp_stream)
-            .await
-            .expect("Failed to pass tcp stream to worker orchestrator!");
+        server.run(tcp_stream).await;
 
         println!("Waiting for another connection...");
     }

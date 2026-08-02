@@ -1,0 +1,6 @@
+--- All development ideas, design decisions, any thoughts --- 
+1. Concurrent server connections
+-> Thought of using a orchestrator and have a fixed pool of workers to not cost cpu cycle for spawning a new task. 
+However turns out creating channels, lock contention to retrieve msg, waking and rescheduling tasks which are required 
+for a fixed pool of workers cost more. Limitation of max concurrent task will be limited in both approach because of
+limited machine resource.
